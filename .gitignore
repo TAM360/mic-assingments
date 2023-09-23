@@ -1,0 +1,4 @@
+venv/*
+.vscode/*
+.virtual_documents/*
+.ipynb_checkpoints/*
