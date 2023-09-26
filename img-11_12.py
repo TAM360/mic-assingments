@@ -8,7 +8,7 @@ def rescaleImage(frame, scale=0.5):
 
     return cv.resize(frame, dimensions, interpolation=cv.INTER_AREA)
 
-img_11_12 = rescaleImage(cv.imread("Assignment_1_MIC/msds23006/11_22.jpg"))
+img_11_12 = cv.imread("Assignment_1_MIC/msds23006/11_22.jpg")
 
 # Morphological operations
 kernel = (3, 3) # np.ones((3, 3), np.uint8)
@@ -20,7 +20,7 @@ closing = cv.morphologyEx(img_11_12, cv.MORPH_CLOSE, kernel) # closing -> dilati
 # blur
 gaus_blur = cv.GaussianBlur(img_11_12, (5, 5), 0)
 bilateral_blur = cv.bilateralFilter(img_11_12, 5, 15, 0)
-median_blur = cv.medianBlur(img_11_12, 5)
+median_blur = cv.medianBlur(img_11_12, 7)
 
 cv.imshow("original ", img_11_12)
 # cv.imshow("eroded img_11_12.jpg", eroded)
