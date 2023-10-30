@@ -67,7 +67,7 @@ class ImagePatcher(object):
                 x_end = (col + 1) * self.num_cols
                 y_start = row * self.num_rows
                 y_end = (row + 1) * self.num_rows
-                patch = color_map[result.labels_[row + col]]
+                patch = self.image_patch_list[row][col]
                 print("patch", patch)
 
                 canvas[y_start:y_end, x_start:x_end] = patch
