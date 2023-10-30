@@ -2,6 +2,9 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from skimage.segmentation import slic, mark_boundaries
+from skimage.util import img_as_float
+from skimage import io
 
 
 class ImagePatcher(object):
@@ -11,7 +14,7 @@ class ImagePatcher(object):
         self.N, self.M = dimensions  # N = # of rows, M = # of columns
         self.num_rows, self.num_cols = self.get_patch_rows_and_columns()
         self.image_patch_list = []
-        self.hist_list = []
+        self.hist_list = np.empty((self.N * self.M, 256))
 
     def get_patch_rows_and_columns(self):
         height, width = self.image.shape
@@ -44,9 +47,19 @@ class ImagePatcher(object):
 
         return self.image_patch_list
 
-    def merge_image_patches(self, canvas_size):
-        height, width = canvas_size
-        canvas = np.zeros((height, width), dtype=np.uint8)
+    def merge_image_patches(self, result):
+        canvas = np.zeros_like(self.image, dtype=np.uint8)
+
+        # TODO: investigate a solution for mapping colors to patches
+        color_map = {
+            0: (255, 0, 0),
+            1: (0, 0, 255),
+            2: (0, 255, 0),
+            3: (247, 247, 0),
+        }
+
+        # for label in result.labels_:
+        #     canvas = color_map[label]
 
         for row in range(self.N):
             for col in range(self.M):
@@ -54,17 +67,22 @@ class ImagePatcher(object):
                 x_end = (col + 1) * self.num_cols
                 y_start = row * self.num_rows
                 y_end = (row + 1) * self.num_rows
-                patch = self.image_patch_list[row][col]
+                patch = color_map[result.labels_[row + col]]
+                print("patch", patch)
+
+                canvas[y_start:y_end, x_start:x_end] = patch
+
+        return canvas
 
     def get_histograms(self):
+        count = 0
         for row in range(self.N):
-            temp = []
             for col in range(self.M):
                 patch = self.image_patch_list[row][col]
                 hist = cv.calcHist([patch], [0], None, [256], [0, 256])
-                temp.append(hist)
-
-            self.hist_list.append(temp)
+                print(min(hist), max(hist), patch.shape)
+                self.hist_list[count, :] = hist.reshape(256)
+                count += 1
 
         return self.hist_list
 
@@ -90,58 +108,63 @@ image_3 = cv.resize(image_3, (1400, 900))
 image_4 = cv.resize(image_4, (1400, 900))
 image_7 = cv.resize(image_7, (1400, 900))
 
-# image_patch_1 = ImagePatcher(image_1, (5, 5))
-# image_patch_list_1 = image_patch_1.split_image("image-1")
 
-# image_patch_histograms_1 = image_patch_1.get_histograms()
+image_patch_1 = ImagePatcher(image_1, (5, 5))
+image_patch_list_1 = image_patch_1.split_image("image-1")
 
-# for idx in range(5):
-#     plt.figure()
-#     plt.plot(image_patch_histograms_1[0][idx])
+# patch level histograms
+image_patch_histograms_1 = image_patch_1.get_histograms()
+# print(image_patch_histograms_1.shape)
+# print(type(image_patch_histograms_1))
 
-# plt.show()
 
-# k means algo
-# k = 4
-# criteria = (cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-# flags = cv.KMEANS_RANDOM_CENTERS
-# compactness, labels, centers = cv.kmeans(
-#     image_patch_histograms_1[0][0], 2, None, criteria, 10, flags
-# )
+# k-means algo
+k = 4
+criteria = (cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+flags = cv.KMEANS_RANDOM_CENTERS
 
-# kmeans = KMeans(n_clusters=4, init="random", random_state=0, n_init="auto").fit(
-#     image_patch_histograms_1[0][0]
-# )
-# print(kmeans.cluster_centers_)
-# plt.show()
+kmeans = KMeans(
+    n_clusters=k, init="random", random_state=0, n_init="auto"
+)
 
+kmeans_result = kmeans.fit(image_patch_histograms_1)
+print(kmeans_result.labels_, len(kmeans_result.labels_))
+result = image_patch_1.merge_image_patches(kmeans_result)
 # super-pixel segmentation
 
 # active contouring
-contour_image_1 = get_image_contour(image_1)
-contour_image_2 = get_image_contour(image_2)
-contour_image_3 = get_image_contour(image_3)
-contour_image_4 = get_image_contour(image_4)
-contour_image_7 = get_image_contour(image_7)
+# contour_image_1 = get_image_contour(image_1)
+# contour_image_2 = get_image_contour(image_2)
+# contour_image_3 = get_image_contour(image_3)
+# contour_image_4 = get_image_contour(image_4)
+# contour_image_7 = get_image_contour(image_7)
 
 # otsu thresholding
-_, image_thresh_ostu_1 = cv.threshold(
-    image_1, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
-)
-_, image_thresh_ostu_2 = cv.threshold(
-    image_2, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
-)
-_, image_thresh_ostu_3 = cv.threshold(
-    image_3, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
-)
-_, image_thresh_ostu_4 = cv.threshold(
-    image_4, 150, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
-)
-_, image_thresh_ostu_7 = cv.threshold(
-    image_7, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
-)
+# _, image_thresh_ostu_1 = cv.threshold(
+#     image_1, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
+# )
+# _, image_thresh_ostu_2 = cv.threshold(
+#     image_2, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
+# )
+# _, image_thresh_ostu_3 = cv.threshold(
+#     image_3, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
+# )
+# _, image_thresh_ostu_4 = cv.threshold(
+#     image_4, 150, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
+# )
+# _, image_thresh_ostu_7 = cv.threshold(
+#     image_7, 120, 255, cv.THRESH_BINARY + cv.THRESH_OTSU
+# )
 
-# cv.imshow("active contour 1", contour_image_1)
+# super-pixel thresholding
+# segments = slic(image_1, n_segments=50, sigma=5, channel_axis=None)
+# fig = plt.figure("Superpixels -- %d segments" % (100))
+# ax = fig.add_subplot(1, 1, 1)
+# ax.imshow(mark_boundaries(image_1, segments))
+# plt.axis("off")
+# plt.show()
+
+# cv.imshow("active contour 1", con25tour_image_1)
 # cv.imshow("active contour 2", contour_image_2)
 # cv.imshow("active contour 3", contour_image_3)
 # cv.imshow("active contour 4", contour_image_4)
@@ -152,5 +175,6 @@ _, image_thresh_ostu_7 = cv.threshold(
 # cv.imshow("image 3 otsu threshold", image_thresh_ostu_3)
 # cv.imshow("image 4 otsu threshold", image_thresh_ostu_4)
 # cv.imshow("image 7 otsu threshold", image_thresh_ostu_7)
+
 cv.waitKey(0)
 cv.destroyAllWindows()
